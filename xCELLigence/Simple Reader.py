@@ -6,14 +6,14 @@ import seaborn as sbn
 import sys
 import traceback
 
-def populate(data,start, stop, wells, samples, datefinder):
+def populate(data, start, stop, wells, samples, datefinder):
     """ this function populates the data sheet with the raw data,
-    start refers to the first timepoint sampled, stop the last timepoint"""
+    start refers to the first timepoint sampled, stop the last timepoint """
 
     """ graphdata is the formatted data table that we will generate graphs from """
     # print(start)
     # print(stop)
-    graphdata = pd.DataFrame(columns=["Timepoint", "Impedence", "Condition", "Replicate", "Date"])
+    graphdata = pd.DataFrame(columns=["Timepoint", "Impedence", "Condition", "Replicate", "Date", "Included"])
     """ replicates establishes the number of replicates for the loaded dataset """
     replicates = {}
     for y in wells:
@@ -21,14 +21,19 @@ def populate(data,start, stop, wells, samples, datefinder):
         # print(samples)
         """ is this a replicate? """
         if not graphdata.isin([samples[y]]).any().any():
-            print("no replicate")
+            # print("no replicate")
             replicates.update({samples[y]: 1})
         else:
-            print("replicate")
+            # print("replicate")
             replicates.update({samples[y]: replicates[samples[y]] + 1})
         """ populate graphdata with this well """
         timer = start*15
         # print("about to start")
+        print(samples[y])
+        if "Lysis" in samples[y] or "lysis" in samples[y]:
+            stop = stop - start
+            timer = 0
+            start = 0
         for q in range(int(start), int(stop)):
             # print(q)
             try:
@@ -37,7 +42,8 @@ def populate(data,start, stop, wells, samples, datefinder):
                 normalized = data.iloc[q][y]
             row = pd.DataFrame(
                 {"Timepoint": timer, "Impedence": normalized, "Condition": samples[y],
-                 "Replicate": replicates[samples[y]], "Date": datefinder.iloc[9][1]}, index=[0])
+                 "Replicate": replicates[samples[y]], "Date": datefinder.iloc[9][1],
+                 "Included":"yes"}, index=[0])
             graphdata = pd.concat([graphdata, row])
             timer = timer + 15
     # print("done")
@@ -68,10 +74,11 @@ def sample_editor(option1,start,stop):
                 workingdata = populate(data,0, len(data), wells, samples, datefinder)
                 while option3 != "exit":
                     input("Here is a sample graph of the data. Please press Enter to view.")
-                    grapher(workingdata, "preview")
+                    grapher(workingdata, "preview","NULL")
                     if option1 == "new":
                         option3 = input(f"Would you like to adjust the x axis? {Fore.BLUE}yes {Fore.WHITE}"
-                                        f" or {Fore.BLUE}no{Fore.WHITE}? ")
+                                        f" or {Fore.BLUE}no{Fore.WHITE}? {Fore.RED}Warning{Fore.WHITE}, if you do this"
+                                        f" the cut timepoints are gone for good. ")
                         if option3 == "yes":
                             start = input("How many minutes forward to start?")
                             if not (int(start) / 15).is_integer():
@@ -86,8 +93,8 @@ def sample_editor(option1,start,stop):
                             if not (int(stop) / 15).is_integer():
                                 print("please choose a number divisible by 15. Defaulting to max.")
                                 stop = len(data)
-                            elif int(stop) / 15 <= len(data):
-                                stop = int(stop) / 15
+                            elif (int(stop)+15) / 15 <= len(data):
+                                stop = (int(stop)+15) / 15
                             else:
                                 print("you've chose a timepoint beyond the scope of the data, defaulting to max.")
                                 stop = len(data)
@@ -101,7 +108,7 @@ def sample_editor(option1,start,stop):
                     else:
                         workingdata = populate(data,start,stop,wells,samples,datefinder)
                         input("Here is a sample graph of the data. Please press Enter to view.")
-                        grapher(workingdata, "preview")
+                        grapher(workingdata, "preview","NULL")
                         option2 = "exit"
                         option3 = "exit"
                         break
@@ -147,22 +154,42 @@ def newsamples(filename):
     return data, samples, wells, datefinder
 
 
-def grapher(graphdata, gtype):
+def grapher(graphdata, gtype, condition):
+    protanopia_friendly_palette = ["#000000", "#56B4E9", "#808080", "#E69F00", "#009E73", "#F0E442", "#0072B2"]
     plt.figure()
     if gtype == "preview":
-        sbn.lineplot(data=graphdata, x="Timepoint", y="Impedence", hue="Condition", palette="colorblind", errorbar=None)
+        sbn.lineplot(data=graphdata, x="Timepoint", y="Impedence", hue="Condition", palette=protanopia_friendly_palette, errorbar=None)
         plt.show()
     elif gtype == "single":
+        """ this will be a single graph of a single condition """
         print("to be added")
     elif gtype == "wholedata":
-        print("to be added")
+        """ this will be a graph of the whole defined dataset """
+        if condition != "NULL":
+            print("to be added")
+        print("this graphing function has several options. This will create large summary graphs of independent variable,"
+              " as well as smaller graphs for individual conditions. Please see below.")
+        print(f"{Fore.BLUE}1{Fore.WHITE} - 1 independent variable graph, <= 8 conditions")
+        print(f"{Fore.BLUE}2{Fore.WHITE} - 2 independent variable graphs, 2 x <=5 condition")
+        print(f"{Fore.BLUE}3{Fore.WHITE} - 3 independent variable graphs, as many conditions, but no smaller graphs")
+        option6 == "NULL"
+        while option6 != "exit":
+            option6 = input("Please select an option from the above: ")
+            if option6 == "1":
+                print("to be added")
+            elif option6 == "2":
+                print("to be added")
+            elif option6 == "3":
+                print("to be added")
+            else:
+                print("input not among selected options.")
     else:
         print("input not among selected options. How did you get here?")
 
 start = 0
 stop = 9999
 """ USER INTERFACE STARTS HERE """
-directory = input(f"Where are we working today, chief? {Fore.BLUE}(Input desired directory): {Fore.WHITE}")
+directory = input(f"{Fore.WHITE}Where are we working today, chief? {Fore.BLUE}(Input desired directory): {Fore.WHITE}")
 os.chdir(directory)
 """ Ask the user if they'd like to setup a new dataset or load a pre-existing graph """
 option1 = "Null"
@@ -174,7 +201,7 @@ while option1 != "exit":
     if option1 == "new":
         projectname = input("Select a name for this new project: ")
         workingdata, start, stop = sample_editor(option1,start,stop)
-        print(f"saving current project as {Fore.BLUE}project-" + projectname + ".csv{Fore.WHITE} in current directory")
+        print(f"saving current project as {Fore.BLUE}project-" + projectname + f".csv {Fore.WHITE} in current directory")
         workingdata.to_csv("project-" + projectname + ".csv")
         metadata = pd.DataFrame({"Start":start,"Stop":stop},index=[0])
         metadata.to_csv("meta-project-" + projectname + ".csv")
@@ -196,8 +223,9 @@ while option1 != "exit":
             option4 = "NULL"
             while option4 != "exit":
                 option4 = input(f"Do you want to {Fore.BLUE}add{Fore.WHITE} data to this project, "
-                                f"{Fore.BLUE}view{Fore.WHITE} the current project, or {Fore.BLUE}modify{Fore.WHITE}"
-                                f" the current project?")
+                                f"{Fore.BLUE}view{Fore.WHITE} the current project, {Fore.BLUE}modify{Fore.WHITE}"
+                                f" the current project, or {Fore.BLUE}export{Fore.WHITE} the current project for"
+                                f" upload onto GraphPad?")
                 if option4 == "add":
                     start = metadata.iloc[0]["Start"]
                     stop = metadata.iloc[0]["Stop"]
@@ -211,10 +239,19 @@ while option1 != "exit":
                     else:
                         print("okay, ignoring that data...")
                 elif option4 == "view":
-                    grapher(workingproject,"preview")
+                    grapher(workingproject,"preview","NULL")
                 elif option4 == "modify":
                     # ADD THIS FUNCTIONALITY
                     print("I haven't added this to the script yet")
+                elif option4 == "export":
+                    grouped = workingproject.groupby(['Timepoint', 'Condition', 'Date'])[
+                        'Impedence'].mean().reset_index()
+                    graphpad = pd.DataFrame()
+                    graphpad['Timepoint'] = workingproject['Timepoint'].unique()
+                    for condition_date, df in grouped.groupby(['Condition', 'Date']):
+                        condition_date_column = ' '.join(condition_date)
+                        graphpad[condition_date_column] = df['Impedence'].values
+                    graphpad.to_csv('graphpad.csv', index=False)
         except:
             print("Error. Did you upload the wrong type of file for this project?")
 
